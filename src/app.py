@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import paho.mqtt.client as mqtt
 from dotenv import load_dotenv
@@ -73,13 +74,22 @@ def process_image(image_bytes: bytes):
     mlflow.log_metric("num_detections", len(detections))
     mlflow.log_metric("top_confidence", max([d['conf'] for d in detections]) if detections else 0)
     # Annotate image with cv2.rectangle/text, save to artifact_path
+    # TODO annotate images
+    annotated_path = "/data/yolo_annotated.jpg"
+    cv2.imwrite(annotated_path, cv_image)
+    mlflow.log_artifact(annotated_path)
+
+    json_path = "/data/detections.json"
+    with open(json_path, "w") as f:
+        json.dump(detections, f, indent=2)
+    mlflow.log_artifact(json_path)
     # Log artifact, detections.json, etc.
 
     # For zero-shot twist later: Switch to OWL-ViT and prompt texts=["deer", "bird in tree", "fox"]
 
     end_time = time.perf_counter()
     inference_time = ((end_time - start_time) * 1000)
-    return inference_time, generated_path
+    return inference_time, annotated_path
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
@@ -98,26 +108,16 @@ def on_message(client, userdata, msg):
     if not msg.topic.endswith('snapshot'):
         return
 
-    with mlflow.start_run(run_name="detection3-aa"):
+    with mlflow.start_run(run_name=str(msg.timestamp)):
         mlflow.log_param("topic", msg.topic)
-        
-        # Handle payload: raw JPEG on snapshot topics
+        mlflow.log_param("detector_type", "vit") 
         image_bytes = msg.payload
-        # If using frigate/events topic instead, it's base64: 
-        # payload = json.loads(msg.payload)
-        # image_bytes = base64.b64decode(payload["after"]["snapshot"])
         
         inference_time, artifact_path = process_image(image_bytes)
         
-        # uncomment below, then run this to step through: kubectl exec -it detection2-bdf99b996-kj6cx -n detection2 -- python -m pdb /app/app.py
-        # import pdb; pdb.set_trace()
         mlflow.log_metric("inference_time", inference_time)
         mlflow.log_artifact(artifact_path)
-        
-        mlflow.log_param("prompt", "miskatonic style")  # or dynamic
-        # Optional: trigger downstream actions (e.g., publish result back to MQTT)
 
-# Create and configure the client
 client = mqtt.Client(client_id="detection3")
 if MQTT_USER and MQTT_PASSWORD:
     client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
@@ -125,6 +125,5 @@ if MQTT_USER and MQTT_PASSWORD:
 client.on_connect = on_connect
 client.on_message = on_message
 
-# Connect and loop
 client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
-client.loop_forever()  # Blocks here; handles reconnects automatically
+client.loop_forever()

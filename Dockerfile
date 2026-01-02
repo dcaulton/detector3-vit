@@ -3,10 +3,7 @@ FROM python:3.10-slim
 WORKDIR /app
 COPY src/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install transformers
-RUN pip install torch
-RUN pip install torchvision 
-RUN pip install timm
+RUN pip install transformers torch torchvision timm
 
 COPY src/ .
 

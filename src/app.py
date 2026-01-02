@@ -64,16 +64,16 @@ def process_image(image_bytes: bytes):
 
     # Post-process (COCO classes: id2label in model.config)
     target_sizes = torch.tensor([cv_image.shape[:2]])
-    results = processor.post_process_object_detection(outputs, threshold=0.7, target_sizes=target_sizes)[0]  # Tune threshold
+    results = processor.post_process_object_detection(outputs, threshold=0.3, target_sizes=target_sizes)[0]  # Tune threshold
 
     # Extract detections
     detections = []
     for score, label, box in zip(results["scores"], results["labels"], results["boxes"]):
-        if score > 0.7:  # Focus on high-conf for nature (avoid noise)
+        if score > 0.3:  # Focus on high-conf for nature (avoid noise)
             box = box.cpu().numpy().astype(int)
             class_name = model.config.id2label[label.item()]
-            if 'animal' in class_name or class_name in ['bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe']:  # Prioritize nature
-                detections.append({'class': class_name, 'conf': float(score), 'box': box.tolist()})
+            detections.append({'class': class_name, 'conf': float(score), 'box': box.tolist()})
+#            if 'animal' in class_name or class_name in ['bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe']:  # Prioritize nature
 
     # Log to MLflow (same as detection2)
     mlflow.log_metric("num_detections", len(detections))

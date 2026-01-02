@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: detection1
+  name: detection3
 spec:
   replicas: 1   # set to 0 to disable
   selector:
     matchLabels:
-      app: detection1
+      app: detection3
   template:
     metadata:
       labels:
-        app: detection1
+        app: detection3
     spec:
       containers:
       - name: app
         tty: true
-        image: ghcr.io/dcaulton/detection1:latest
+        image: ghcr.io/dcaulton/detection3:latest
         imagePullPolicy: Always
         env:
           - name: MQTT_BROKER
@@ -43,5 +43,5 @@ spec:
       volumes:
         - name: experiment-data
           hostPath:
-            path: /mnt/data/detection-experiments/detection1
+            path: /mnt/data/detection-experiments/detection3
             type: DirectoryOrCreate

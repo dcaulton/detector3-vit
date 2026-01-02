@@ -6,7 +6,7 @@ import base64
 import cv2
 import numpy as np
 import torch
-import torch.nn.functional as F
+from transformers import AutoImageProcessor, AutoModelForObjectDetection
 import sys
 import datetime
 import logging
@@ -20,7 +20,10 @@ sys.stdout.flush()
 load_dotenv()  # For local dev; in k8s use Secrets
 
 mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://mlflow-service.mlflow.svc.cluster.local:5000"))
-mlflow.set_experiment("detection1")
+mlflow.set_experiment("detection3")
+
+processor = AutoImageProcessor.from_pretrained("SenseTime/deformable-detr")  # Or "facebook/detr-resnet-50" for classic; try "microsoft/conditional-detr-resnet-50" for faster convergence
+model = AutoModelForObjectDetection.from_pretrained("SenseTime/deformable-detr").to('cuda')  # Deformable-DETR is a strong ViT-ish upgrade
 
 # MQTT credentials (from Secrets in k8s)
 MQTT_BROKER = os.getenv("MQTT_BROKER", "mqtt-broker.default.svc.cluster.local")  # adjust to your broker service
@@ -46,23 +49,34 @@ def check_gpu():
 
 def process_image(image_bytes: bytes):
     start_time = time.perf_counter()
-    # Decode JPEG
-    nparr = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    
-    # Convert numpy to torch tensor on GPU
-    tensor = torch.from_numpy(img).permute(2, 0, 1).float().unsqueeze(0).cuda() / 255.0
 
-    # Example GPU ops: resize + gaussian blur (you can chain more)
-    tensor = F.interpolate(tensor, size=(640, 640), mode='bilinear', align_corners=False)
-    tensor = F.avg_pool2d(tensor, kernel_size=5, stride=1, padding=2)  # Approx blur
+    cv_image = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+    inputs = processor(images=cv_image, return_tensors="pt").to('cuda')
 
-    # Back to numpy for saving/MLflow
-    processed_img = (tensor.squeeze(0).permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+    with torch.no_grad():
+        outputs = model(**inputs)
 
-    generated_path = "/data/generated.jpg"  # PVC mount
-    cv2.imwrite(generated_path, img)
-    
+    # Post-process (COCO classes: id2label in model.config)
+    target_sizes = torch.tensor([cv_image.shape[:2]])
+    results = processor.post_process_object_detection(outputs, threshold=0.7, target_sizes=target_sizes)[0]  # Tune threshold
+
+    # Extract detections
+    detections = []
+    for score, label, box in zip(results["scores"], results["labels"], results["boxes"]):
+        if score > 0.7:  # Focus on high-conf for nature (avoid noise)
+            box = box.cpu().numpy().astype(int)
+            class_name = model.config.id2label[label.item()]
+            if 'animal' in class_name or class_name in ['bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe']:  # Prioritize nature
+                detections.append({'class': class_name, 'conf': float(score), 'box': box.tolist()})
+
+    # Log to MLflow (same as detection2)
+    mlflow.log_metric("num_detections", len(detections))
+    mlflow.log_metric("top_confidence", max([d['conf'] for d in detections]) if detections else 0)
+    # Annotate image with cv2.rectangle/text, save to artifact_path
+    # Log artifact, detections.json, etc.
+
+    # For zero-shot twist later: Switch to OWL-ViT and prompt texts=["deer", "bird in tree", "fox"]
+
     end_time = time.perf_counter()
     inference_time = ((end_time - start_time) * 1000)
     return inference_time, generated_path
@@ -84,7 +98,7 @@ def on_message(client, userdata, msg):
     if not msg.topic.endswith('snapshot'):
         return
 
-    with mlflow.start_run(run_name="detection1-aa"):
+    with mlflow.start_run(run_name="detection3-aa"):
         mlflow.log_param("topic", msg.topic)
         
         # Handle payload: raw JPEG on snapshot topics
@@ -104,7 +118,7 @@ def on_message(client, userdata, msg):
         # Optional: trigger downstream actions (e.g., publish result back to MQTT)
 
 # Create and configure the client
-client = mqtt.Client(client_id="detection1")
+client = mqtt.Client(client_id="detection3")
 if MQTT_USER and MQTT_PASSWORD:
     client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
 

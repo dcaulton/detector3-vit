@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: detection1
+  name: detection3
   labels:
-    app: detection1
+    app: detection3
 spec:
   type: ClusterIP  # Internal only; change to LoadBalancer/NodePort only if needed
   ports:
@@ -14,4 +14,4 @@ spec:
       targetPort: 8080
       name: http       # optional debug endpoint (FastAPI, Flask, etc.)
   selector:
-    app: detection1
+    app: detection3

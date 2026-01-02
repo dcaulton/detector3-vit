@@ -1,5 +1,5 @@
 paho-mqtt
 dotenv
-opencv-python
+opencv-python-headless
 numpy
 mlflow

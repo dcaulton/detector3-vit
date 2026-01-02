@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: detection1
+  labels:
+    app: detection1
+spec:
+  type: ClusterIP  # Internal only; change to LoadBalancer/NodePort only if needed
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: metrics   # e.g., if you expose Prometheus metrics on 8000
+    - port: 8080
+      targetPort: 8080
+      name: http       # optional debug endpoint (FastAPI, Flask, etc.)
+  selector:
+    app: detection1

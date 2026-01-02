@@ -1,0 +1,13 @@
+paho-mqtt==1.6.1
+requests==2.32.3
+opencv-python-headless==4.10.0.84
+torch==2.0.1 --index-url https://download.pytorch.org/whl/cu118  # For 1080 Ti; adjust for 5080 later
+torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cu118
+diffusers==0.30.3          # Image generation (Stable Diffusion, etc.)
+transformers==4.45.2
+accelerate==0.34.2
+gTTS==2.5.3                # Text-to-speech
+mlflow==2.16.2
+pillow==10.4.0
+numpy==1.24.4
+python-dotenv==1.0.1

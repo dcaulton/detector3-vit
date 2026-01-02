@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: detection1
+spec:
+  replicas: 1   # set to 0 to disable
+  selector:
+    matchLabels:
+      app: detection1
+  template:
+    metadata:
+      labels:
+        app: detection1
+    spec:
+      containers:
+      - name: app
+        tty: true
+        image: ghcr.io/dcaulton/detection1:latest
+        imagePullPolicy: Always
+        env:
+          - name: MQTT_BROKER
+            value: "mosquitto.mqtt.svc.cluster.local"
+          - name: MQTT_PORT
+            value: "1883"
+          - name: MQTT_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: detection-app-secrets
+                key: MQTT_USERNAME
+          - name: MQTT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: detection-app-secrets
+                key: MQTT_PASSWORD
+        resources:
+          limits:
+            nvidia.com/gpu: "1"
+          requests:
+            nvidia.com/gpu: "1"
+        volumeMounts:
+        - mountPath: /data
+          name: experiment-data
+      volumes:
+        - name: experiment-data
+          hostPath:
+            path: /mnt/data/detection-experiments/detection1
+            type: DirectoryOrCreate

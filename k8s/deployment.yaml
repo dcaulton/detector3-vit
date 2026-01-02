@@ -15,7 +15,7 @@ spec:
       containers:
       - name: app
         tty: true
-        image: dcaulton/detection3:latest
+        image: dcaulton/detection3-vit:latest
         imagePullPolicy: Always
         env:
           - name: MQTT_BROKER

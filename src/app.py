@@ -1,4 +1,5 @@
 import os
+import hashlib
 import json
 import time
 import paho.mqtt.client as mqtt
@@ -21,7 +22,7 @@ sys.stdout.flush()
 load_dotenv()  # For local dev; in k8s use Secrets
 
 mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://mlflow-service.mlflow.svc.cluster.local:5000"))
-mlflow.set_experiment("detection3")
+mlflow.set_experiment("exp-2026-yolo-vit")
 
 processor = AutoImageProcessor.from_pretrained("SenseTime/deformable-detr")  # Or "facebook/detr-resnet-50" for classic; try "microsoft/conditional-detr-resnet-50" for faster convergence
 model = AutoModelForObjectDetection.from_pretrained("SenseTime/deformable-detr").to('cuda')  # Deformable-DETR is a strong ViT-ish upgrade
@@ -47,6 +48,10 @@ def check_gpu():
         print("No CUDA – falling back to CPU")
     print(f"[{datetime.datetime.now()}] GPU TEST END")
     sys.stdout.flush()
+
+def get_unique_key(msg, image_bytes):
+    payload_hash = hashlib.sha256(image_bytes).hexdigest()
+    return f"{msg.topic}_{payload_hash}"
 
 def process_image(image_bytes: bytes):
     start_time = time.perf_counter()
@@ -108,10 +113,12 @@ def on_message(client, userdata, msg):
     if not msg.topic.endswith('snapshot'):
         return
 
-    with mlflow.start_run(run_name=str(msg.timestamp)):
+    image_bytes = msg.payload
+    run_key = get_unique_key(msg, image_bytes)
+
+    with mlflow.start_run(run_name=run_key):
         mlflow.log_param("topic", msg.topic)
         mlflow.log_param("detector_type", "vit") 
-        image_bytes = msg.payload
         
         inference_time, artifact_path = process_image(image_bytes)
         

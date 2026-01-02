@@ -3,3 +3,4 @@ dotenv
 opencv-python-headless
 numpy
 mlflow
+timm

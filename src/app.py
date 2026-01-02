@@ -12,7 +12,7 @@ import datetime
 import logging
 import mlflow
 
-print(f"[{datetime.datetime.now()}] >>> DETECTION1 CONTAINER STARTED <<<")
+print(f"[{datetime.datetime.now()}] >>> DETECTION3 CONTAINER STARTED <<<")
 print(f"[{datetime.datetime.now()}] Python version: {sys.version}")
 print(f"[{datetime.datetime.now()}] Attempting MQTT connection to mosquitto.mqtt.svc.cluster.local:1883...")
 sys.stdout.flush()

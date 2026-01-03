@@ -22,7 +22,7 @@ sys.stdout.flush()
 load_dotenv()  # For local dev; in k8s use Secrets
 
 mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://mlflow-service.mlflow.svc.cluster.local:5000"))
-mlflow.set_experiment("exp-2026-yolo-vit")
+mlflow.set_experiment("detection")
 
 processor = AutoImageProcessor.from_pretrained("SenseTime/deformable-detr")  # Or "facebook/detr-resnet-50" for classic; try "microsoft/conditional-detr-resnet-50" for faster convergence
 model = AutoModelForObjectDetection.from_pretrained("SenseTime/deformable-detr").to('cuda')  # Deformable-DETR is a strong ViT-ish upgrade
@@ -33,6 +33,7 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
 MQTT_USER = os.getenv("MQTT_USER")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
 MQTT_TOPIC = "frigate/#"
+MODEL_NAME = 'vit-deformable-detr'
 
 def check_gpu():
     print(f"[{datetime.datetime.now()}] GPU TEST START")
@@ -80,11 +81,11 @@ def process_image(image_bytes: bytes):
     mlflow.log_metric("top_confidence", max([d['conf'] for d in detections]) if detections else 0)
     # Annotate image with cv2.rectangle/text, save to artifact_path
     # TODO annotate images
-    annotated_path = "/data/yolo_annotated.jpg"
+    annotated_path = f"/data/detector3_{MODEL_NAME}_annotated.jpg"
     cv2.imwrite(annotated_path, cv_image)
     mlflow.log_artifact(annotated_path)
 
-    json_path = "/data/detections.json"
+    json_path = f"/data/detector3_{MODEL_NAME}_detections.json"
     with open(json_path, "w") as f:
         json.dump(detections, f, indent=2)
     mlflow.log_artifact(json_path)
@@ -118,7 +119,7 @@ def on_message(client, userdata, msg):
 
     with mlflow.start_run(run_name=run_key):
         mlflow.log_param("topic", msg.topic)
-        mlflow.log_param("detector_type", "vit") 
+        mlflow.log_param("detector_type", MODEL_NAME) 
         
         inference_time, artifact_path = process_image(image_bytes)
         
